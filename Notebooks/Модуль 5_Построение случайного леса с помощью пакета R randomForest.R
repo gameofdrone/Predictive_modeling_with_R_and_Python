@@ -19,9 +19,6 @@ holdout$random_number <- NULL
 
 # 5.1.2 Построение модели и получение OOB оценки качества
 
-# устанавливаем пакет randomForest
-# install.packages("randomForest")
-
 # загружаем пакет randomForest
 library(randomForest)
 
@@ -47,7 +44,24 @@ plot(model)
 set.seed(152)
 tuneRF(development[,1:13], development[,14], ntreeTry=500, trace=FALSE)
 
-# 9.1.3 Важности предикторов
+
+# 5.1.3 Получение информации о деревьях случайного леса
+
+# выведем информацию о последних 15 узлах
+# дерева №1 случайного леса, не отображая
+# метки переменных расщепления и метки
+# спрогнозированных классов
+info_tree1 <- getTree(model, k=1, labelVar=F)
+tail(info_tree1, 15)
+
+# выведем информацию о последних 15 узлах
+# дерева №1 случайного леса, отобразив
+# метки переменных расщепления и метки
+# спрогнозированных классов
+info_tree1 <- getTree(model, k=1, labelVar=T)
+tail(info_tree1, 15)
+
+# 5.1.3 Важности предикторов
 
 # выводим важности предикторов
 importance(model)
@@ -55,87 +69,123 @@ importance(model)
 # выводим график важности предикторов
 varImpPlot(model)
 
-# 9.1.4 Графики частной зависимости
+# 5.1.4 Графики частной зависимости
 
+# строим график частной зависимости для переменной age,
+# интересующий класс – класс 1 (класс Есть отклик)
+# значение по оси ординат - разность между логарифмом 
+# доли голосов, поданных деревьями за интересующий класс 
+# зависимой переменной, и усредненной суммой логарифмов 
+# голосов, поданных деревьями за каждый класс
 partialPlot(model, development, age, 1)
+
+# строим график частной зависимости для переменной cus_leng,
+# интересующий класс – класс 1 (класс Есть отклик)
 partialPlot(model, development, cus_leng, 1)
+
+# строим график частной зависимости для переменной atm_user,
+# интересующий класс – класс 1 (класс Есть отклик)
 partialPlot(model, development, atm_user, 1)
+
+# строим график частной зависимости для переменной atm_user,
+# интересующий класс – класс 0 (класс Нет отклика)
 partialPlot(model, development, atm_user, 0)
 
-# 9.1.5 Вычисление вероятностей классов
+# 5.1.5 Вычисление вероятностей классов
 
-prob <- predict(model, development, type="prob")
-prob2 <- predict(model, holdout, type="prob")
+# вычисляем вероятности классов для обучающей выборки
+# обычным методом
+prob_dev <- predict(model, development, type="prob")
+# вычисляем вероятности классов для обучающей выборки
+# по методу OOB
+prob_dev_oob <- predict(model, type="prob")
 
-tail(prob, 5)
+# выводим вероятности для последних 5 наблюдений
+# обучающей выборки, вычисленные по обычному методу
+tail(prob_dev, 5)
 
-tail(prob2, 5)
+# выводим вероятности для последних 5 наблюдений
+# обучающей выборки, вычисленные по методу OOB
+tail(prob_dev_oob, 5)
 
-# Создаем таблицы данных, содержащие исходную информацию, 
-# и спрогнозированные вероятности.
-newdevelopment<-data.frame(development, result=prob)
-newholdout<-data.frame(holdout, result=prob2)
-# На основе таблиц данных записываем отдельные CSV файлы.
-write.csv(newdevelopment, "resultRFcl_development.csv")
-write.csv(newholdout, "resultRFcl_holdout.csv")
+# 5.1.6 Оценка дискриминирующей способности модели с помощью ROC-кривой
 
-# 9.1.6 Оценка дискриминирующей способности модели с помощью ROC-кривой
-
-# Загружаем пакет для построения ROC-кривых.
+# загружаем пакет pROC для построения ROC-кривых
 library(pROC)
-# Строим ROC-кривые.
-roc_dev<-plot(roc(development$response, prob[,2], ci=TRUE), percent=TRUE, 
-             print.auc=TRUE, col="#1c61b6")
-roc_hold<-plot(roc(holdout$response, prob2[,2], ci=TRUE), percent=TRUE, 
-         print.auc=TRUE, col="#008600", print.auc.y= .4, add=TRUE)
-# Создаем легенды к ROC-кривым.
-legend("bottomright", legend=c("Обучающая выборка", "Контрольная выборка"), 
+# строим ROC-кривую для обучающей выборки (на основе 
+# вероятностей, вычисленных обычным способом)
+roc_dev<-plot(roc(development$response, prob_dev[,2], ci=TRUE), percent=TRUE, 
+              print.auc=TRUE, col="#1c61b6")
+# вычисляем вероятности классов для контрольной выборки
+prob_hold <- predict(model, holdout, type="prob")
+# добавляем ROC-кривую для контрольной выборки
+roc_hold<-plot(roc(holdout$response, prob_hold[,2], ci=TRUE), percent=TRUE, 
+               print.auc=TRUE, col="#008600", print.auc.y= .4, add=TRUE)
+# создаем легенды к ROC-кривым
+legend("bottomright", legend=c("Обучающая выборка (обычный метод)", 
+                               "Контрольная выборка"), 
        col=c("#1c61b6", "#008600"), lwd=2)
 
-roc(development$response, prob[,2], ci=TRUE)
 
-roc(holdout$response, prob2[,2], ci=TRUE)
-
-prob <- predict(model, type="prob")
-
-# Строим ROC-кривые.
-roc_dev<-plot(roc(development$response, prob[,2], ci=TRUE), percent=TRUE, 
-             print.auc=TRUE, col="#1c61b6")
-roc_hold<-plot(roc(holdout$response, prob2[,2], ci=TRUE), percent=TRUE, 
-         print.auc=TRUE, col="#008600", print.auc.y= .4, add=TRUE)
-# Создаем легенды к ROC-кривым.
-legend("bottomright", legend=c("Обучающая выборка", "Контрольная выборка"), 
+# строим ROC-кривую для обучающей выборки (на основе 
+# вероятностей, вычисленных по способу OOB)
+roc_dev<-plot(roc(development$response, prob_dev_oob[,2], ci=TRUE), percent=TRUE, 
+              print.auc=TRUE, col="#1c61b6")
+# добавляем ROC-кривую для контрольной выборки
+roc_hold<-plot(roc(holdout$response, prob_hold[,2], ci=TRUE), percent=TRUE, 
+               print.auc=TRUE, col="#008600", print.auc.y= .4, add=TRUE)
+# cоздаем легенды к ROC-кривым
+legend("bottomright", legend=c("Обучающая выборка (метод OOB)", 
+                               "Контрольная выборка"), 
        col=c("#1c61b6", "#008600"), lwd=2)
 
-# Загружаем пакет rpart.
+
+# загружаем пакет rpart
 library(rpart)
-# Подгоняем модель CRT
-model2<-rpart(response ~., development)
-# Записываем вероятности, спрогнозированные деревом CRT, в объект score
-score <- predict(model2, holdout, type="prob")
-# Визуализируем обе ROC-кривые.
-rf<-plot(roc(holdout$response, prob2[,2], ci=TRUE), percent=TRUE, print.auc=TRUE, col="#1c61b6")
-crt<-plot(roc(holdout$response, score[,2], ci=TRUE), percent=TRUE, 
-         print.auc=TRUE, col="#008600", print.auc.y= .4, add=TRUE)
-# Создаем легенды к ROC-кривым.
+# подгоняем модель CART
+set.seed(42)
+model_cart <-rpart(response ~., development)
+# записываем вероятности, спрогнозированные деревом CART
+# для контрольной выборки, в объект prob_hold_cart 
+prob_hold_cart <- predict(model_cart, holdout, type="prob")
+# визуализируем обе ROC-кривые
+rf<-plot(roc(holdout$response, prob_hold[,2], ci=TRUE), 
+         percent=TRUE, print.auc=TRUE, col="#1c61b6")
+cart<-plot(roc(holdout$response, prob_hold_cart[,2], ci=TRUE), percent=TRUE, 
+           print.auc=TRUE, col="#008600", print.auc.y= .4, add=TRUE)
+# создаем легенды к ROC-кривым
 legend("bottomright", legend=c("Случайный лес", "Дерево CRT"), 
        col=c("#1c61b6", "#008600"), lwd=2)
 
-# 9.1.7 Получение спрогнозированных классов зависимой переменной
 
+# 5.1.7 Получение спрогнозированных классов зависимой переменной
+
+# задаем стартовое значение генератора
+# случайных чисел
 set.seed(152)
-resp <- predict(model, development, type="response")
 
-tail(resp, 5)
+# вычисляем классы зависимой переменной 
+# для обучающей выборки обычным способом
+resp_dev <- predict(model, development, type="response")
 
-table(development$response, resp)
+# выводим классы зависимой переменной
+# для последних 5 наблюдений обучающей 
+# выборки, вычисленные по обычному методу
+tail(resp_dev, 5)
 
+# выводим матрицу ошибок для обучающей выборки
+# на основе классов, вычисленных обычным методом
+table(development$response, resp_dev)
+
+# задаем стартовое значение генератора
+# случайных чисел
 set.seed(152)
-resp2 <- predict(model, holdout, type="response")
+# вычисляем классы зависимой переменной 
+# для контрольной выборки
+resp_hold <- predict(model, holdout, type="response")
+# выводим матрицу ошибок для контрольной выборки
+table(holdout$response, resp_hold)
 
-tail(resp2, 5)
-
-table(holdout$response, resp2)
 
 # 9.1.9 График зазора прогнозов
 
