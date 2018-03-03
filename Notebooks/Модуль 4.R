@@ -26,8 +26,8 @@ oob_predictions <- predict(model, type="response")
 results <-data.frame(data, result=oob_predictions)
 results
 
-# смотрим частоты голосов деревьев, построенных
-# по out-of-bag выборкам, для каждого класса
+# смотрим частоты голосов деревьев для каждого класса
+# (деревья построены по out-of-bag выборкам)
 oob_vote_freq <- predict(model, type="vote", norm.votes=FALSE)
 oob_vote_freq
 
@@ -35,8 +35,8 @@ oob_vote_freq
 oob_probabilities <- predict(model, type="prob")
 oob_probabilities
 
-# смотрим процентные доли голосов деревьев, построенных
-# по out-of-bag выборкам, для каждого класса
+# смотрим процентные доли голосов деревьев для каждого класса
+# (деревья построены по out-of-bag выборкам)
 oob_vote_fract <- predict(model, type="vote", norm.votes=TRUE)
 oob_vote_fract
 
@@ -45,8 +45,8 @@ predictions <- predict(model, data, type="response")
 results <-data.frame(data, result=predictions)
 results
 
-# смотрим частоты голосов деревьев, построенных по всем 
-# бутстреп-выборкам, для каждого класса
+# смотрим частоты голосов деревьев для каждого класса
+# (деревья построены по всем бутстреп-выборкам)
 vote_freq <- predict(model, data, type="vote", norm.votes=FALSE)
 vote_freq
 
@@ -54,8 +54,8 @@ vote_freq
 probabilities <- predict(model, data, type="prob")
 probabilities
 
-# смотрим процентные доли голосов деревьев, построенных
-# по всем бутстреп-выборкам, для каждого класса
+# смотрим процентные доли голосов деревьев для каждого класса
+# (деревья построены по всем бутстреп-выборкам)
 vote_fract <- predict(model, data, type="vote", norm.votes=TRUE)
 vote_fract
 
