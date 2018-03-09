@@ -36,7 +36,7 @@ print(model)
 # можно еще вывести так
 table(development$response, predict(model))
 
-# строим график зависимости OOB ошибок классификации
+# строим график зависимости ошибок классификации по методу OOB
 # от количества случайно отбираемых предикторов
 plot(model)
 
@@ -61,7 +61,7 @@ tail(info_tree1, 15)
 info_tree1 <- getTree(model, k=1, labelVar=T)
 tail(info_tree1, 15)
 
-# 5.1.3 Важности предикторов
+# 5.1.4 Важности предикторов
 
 # выводим важности предикторов
 importance(model)
@@ -69,7 +69,7 @@ importance(model)
 # выводим график важности предикторов
 varImpPlot(model)
 
-# 5.1.4 Графики частной зависимости
+# 5.1.5 Графики частной зависимости
 
 # строим график частной зависимости для переменной age,
 # интересующий класс – класс 1 (класс Есть отклик)
@@ -91,7 +91,7 @@ partialPlot(model, development, atm_user, 1)
 # интересующий класс – класс 0 (класс Нет отклика)
 partialPlot(model, development, atm_user, 0)
 
-# 5.1.5 Вычисление вероятностей классов
+# 5.1.6 Вычисление вероятностей классов
 
 # вычисляем вероятности классов для обучающей выборки
 # обычным методом
@@ -108,7 +108,7 @@ tail(prob_dev, 5)
 # обучающей выборки, вычисленные по методу OOB
 tail(prob_dev_oob, 5)
 
-# 5.1.6 Оценка дискриминирующей способности модели с помощью ROC-кривой
+# 5.1.7 Оценка дискриминирующей способности модели с помощью ROC-кривой
 
 # загружаем пакет pROC для построения ROC-кривых
 library(pROC)
@@ -158,7 +158,7 @@ legend("bottomright", legend=c("Случайный лес", "Дерево CRT"),
        col=c("#1c61b6", "#008600"), lwd=2)
 
 
-# 5.1.7 Получение спрогнозированных классов зависимой переменной
+# 5.1.8 Получение спрогнозированных классов зависимой переменной
 
 # задаем стартовое значение генератора
 # случайных чисел
@@ -187,123 +187,378 @@ resp_hold <- predict(model, holdout, type="response")
 table(holdout$response, resp_hold)
 
 
-# 9.1.9 График зазора прогнозов
+# 5.1.9 График зазора прогнозов
 
 plot(margin(model))
 
-# 9.2 Построение ансамбля деревьев регрессии
-# 9.2.1 Подготовка данных
+# Лекция 5.2 Построение ансамбля деревьев регрессии
 
-data <- read.csv2("C:/Trees/Income.csv")
-str(data)
+# 5.2.1 Подготовка данных
 
-set.seed(42)
+# загружаем данные
+data <- read.csv2("C:/Trees/Creddebt.csv")
 
-data$random_number <- runif(nrow(data),0,1)
-development <- data[which(data$random_number > 0.3), ]
-holdout <- data[ which(data$random_number <= 0.3), ]
+# выполняем необходимые преобразования
+data$ed <- ordered(data$ed, levels = c("Неполное среднее", "Среднее", "Среднее специальное",   
+                                       "Незаконченное высшее", "Высшее, ученая степень"))
+set.seed(100)
+ind <- sample(2,nrow(data),replace=TRUE,prob=c(0.7,0.3))
+development <- data[ind==1,]
+holdout <- data[ind==2,]
 
-development$random_number <- NULL
-holdout$random_number <- NULL
+# 5.2.2 Построение модели и получение OOB оценки качества
 
-library(randomForest)
+# задаем стартовое значение генератора случайных
+# чисел для воспроизводимости результатов
 set.seed(152)
 
-# 9.2.2 Построение модели и получение OOB оценки качества
+# строим случайный лес деревьев регрессии
+model<-randomForest(creddebt ~., development, importance=TRUE)
 
-model<-randomForest(income ~., development, importance=TRUE)
+# выводим информацию о качестве модели
 print(model)
+
+# строим график зависимости среднеквадратичной ошибки по методу OOB
+# от количества деревьев в ансамбле
 plot(model)
 
-# 9.2.3 Важности предикторов
+
+# 5.2.3 Важности предикторов
 
 importance(model)
 varImpPlot(model)
 
 # 9.2.4 Графики частной зависимости
 
-partialPlot(model, development, local)
-partialPlot(model, development, longdist)
+# строим график частной зависимости для переменной income
+partialPlot(model, development, income)
+
+# строим график частной зависимости для переменной debtinc
+partialPlot(model, development, debtinc)
 
 # 9.2.5 Работа с прогнозами и вычисление среднеквадратической ошибки
 
-predvalue_development <- predict(model, development)
-tail(predvalue_development, 5)
+# прогнозируем значения зависимой переменной 
+# для обучающей выборки обычным способом
+predvalue_dev <- predict(model, development)
 
+# выводим значения зависимой переменной
+# для последних 5 наблюдений обучающей 
+# выборки, вычисленные по обычному методу
+tail(predvalue_dev, 5)
 
-MSE_development <- sum((development$income - predvalue_development)^2)/nrow(development)
-MSE_development
+# вычисляем среднеквадратичную ошибку для обучающей выборки по обычному методу, 
+# для этого сумму квадратов разностей между фактическими и спрогнозированными 
+# значениями зависимой переменной делим на количество наблюдений, при этом
+# каждое спрогнозированное значение – результат усреднения средних
+# значений, вычисленных деревьями по всем бутстреп-выборкам 
+MSE_dev <- sum((development$creddebt - predvalue_dev)^2)/nrow(development)
 
-predvalue_holdout <- predict(model, holdout)
-tail(predvalue_holdout, 5)
+# вычисляем сумму квадратов отклонений фактических значений
+# зависимой переменной в обучающей выборке от ее среднего значения
+TSS <- sum((development$creddebt-(mean(development$creddebt)))^2)
+# вычисляем сумму квадратов отклонений фактических значений 
+# зависимой переменной в обучающей выборке от спрогнозированных, 
+# при этом каждое спрогнозированное значение – результат усреднения 
+# средних значений, вычисленных деревьями по всем бутстреп-выборкам 
+RSS <- sum((development$creddebt-predvalue_dev)^2)
+# вычисляем R-квадрат для обучающей выборки по обычному методу
+R2_dev <- (1-(RSS/TSS))*100
 
-MSE_holdout <- sum((holdout$income - predvalue_holdout)^2)/nrow(holdout)
-MSE_holdout
+# печатаем результаты
+output <- c(MSE_dev, R2_dev)
+names(output) <- c("MSE", "R2")
+output
 
-# 9.2.6 Улучшение качества прогнозов
+# прогнозируем значения зависимой переменной 
+# для обучающей выборки по методу OOB
+oob_predvalue_dev <- predict(model)
 
+# вычисляем среднеквадратичную ошибку для обучающей выборки по обычному методу, 
+# для этого сумму квадратов разностей между фактическими и спрогнозированными 
+# значениями зависимой переменной делим на количество наблюдений, при этом
+# каждое спрогнозированное значение – результат усреднения средних
+# значений, вычисленных деревьями по OOB выборкам 
+oob_MSE_dev <- sum((development$creddebt-oob_predvalue_dev)^2)/nrow(development)
+
+# вычисляем сумму квадратов отклонений фактических значений
+# зависимой переменной в обучающей выборке от ее среднего значения
+TSS <- sum((development$creddebt-(mean(development$creddebt)))^2)
+# вычисляем сумму квадратов отклонений фактических значений 
+# зависимой переменной в обучающей выборке от спрогнозированных, 
+# при этом каждое спрогнозированное значение – результат усреднения 
+# средних значений, вычисленных деревьями по OOB выборкам 
+RSS <- sum((development$creddebt-oob_predvalue_dev)^2)
+# вычисляем R-квадрат для обучающей выборки по методу OOB
+oob_R2_dev <- (1-(RSS/TSS))*100
+
+# печатаем результаты
+output <- c(oob_MSE_dev, oob_R2_dev)
+names(output) <- c("MSE", "R2")
+output
+
+# прогнозируем значения зависимой переменной 
+# для контрольной выборки
+predvalue_hold <- predict(model, holdout)
+
+# выводим значения зависимой переменной
+# для последних 5 наблюдений контрольной 
+# выборки
+tail(predvalue_hold, 5)
+
+# вычисляем среднеквадратичную ошибку для контрольной выборки 
+MSE_hold <- sum((holdout$creddebt-predvalue_hold)^2)/nrow(holdout)
+# вычисляем сумму квадратов отклонений фактических значений
+# зависимой переменной в контрольной выборке от ее среднего значения
+TSS <- sum((holdout$creddebt-(mean(holdout$creddebt)))^2)
+# вычисляем сумму квадратов отклонений фактических значений 
+# зависимой переменной в контрольной выборке от спрогнозированных
+RSS <- sum((holdout$creddebt-predvalue_hold)^2)
+# вычисляем R-квадрат для контрольной выборки
+R2_hold <- (1-(RSS/TSS))*100
+# печатаем результаты
+output <- c(MSE_hold, R2_hold)
+names(output) <- c("MSE", "R2")
+output
+
+# 5.2.6 Улучшение качества прогнозов
+
+# настраиваем оптимальное значение mtry
 set.seed(152)
-tuneRF(development[,1:10], development[,11], ntreeTry=500, trace=FALSE)
+tuneRF(development[,1:6], development[,7], ntreeTry=500, trace=FALSE)
 
+# строим модель c новым значением mtry
 set.seed(152)
-model2<-randomForest(income ~., development, mtry=6)
+model2<-randomForest(creddebt ~., development, mtry=6)
 
 print(model2)
 
-newpredvalue_holdout <- predict(model2, holdout)
-newMSE_holdout <- sum((holdout$income - newpredvalue_holdout)^2)/nrow(holdout)
-newMSE_holdout
+# прогнозируем значения зависимой переменной 
+# для контрольной выборки
+predval_hold <- predict(model2, holdout)
+# вычисляем среднеквадратичную ошибку для контрольной выборки 
+MSE_hold <- sum((holdout$creddebt-predval_hold)^2)/nrow(holdout)
+# вычисляем сумму квадратов отклонений фактических значений
+# зависимой переменной в контрольной выборке от ее среднего значения
+TSS <- sum((holdout$creddebt-(mean(holdout$creddebt)))^2)
+# вычисляем сумму квадратов отклонений фактических значений 
+# зависимой переменной в контрольной выборке от спрогнозированных
+RSS <- sum((holdout$creddebt-predval_hold)^2)
+# вычисляем R-квадрат для контрольной выборки
+R2_hold <- (1-(RSS/TSS))*100
+# печатаем результаты
+output <- c(MSE_hold, R2_hold)
+names(output) <- c("MSE", "R2")
+output
 
-# 9.2.7 Вычисление коэффициента детерминации
+# 5.2.7 Получение более развернутого вывода о качестве модели
 
-TSS <- sum((holdout$income-(mean(holdout$income)))^2)
-RSS <- sum((holdout$income-newpredvalue_holdout)^2)
-R2 <- 1-RSS/TSS
-R2
+# создаем датафреймы
+Xtrain <-development[,1:6]
+ytrain <-development[,7]
+Xtest <-holdout[,1:6]
+ytest <-holdout[,7]
 
-# 9.2.8 Получение более развернутого вывода о качестве модели
-
-Xtrain <-development[,1:10]
-ytrain <-development[,11]
-Xtest <-holdout[,1:10]
-ytest <-holdout[,11]
-
+# строим модель, теперь мы получим
+# более развернутые результаты
 set.seed(152)
-model3 <- randomForest(Xtrain, ytrain, Xtest, ytest, mtry=6)
+model2 <- randomForest(Xtrain, ytrain, Xtest, ytest, mtry=6)
 
-print(model3)
+# выводим информацию о качестве модели
+print(model2)
 
-# 9.3 Поиск оптимальных параметров случайного леса с помощью пакета caret
+# 5.3 Поиск оптимальных параметров случайного леса с помощью пакета caret
 
-# 9.3.1 Схема оптимизации параметров, реализованная в пакете caret
+# 5.3.1 Схема оптимизации параметров, реализованная в пакете caret
 
-# 9.3.2 Настройка условий оптимизации
+# 5.3.2 Настройка условий оптимизации
 
-# 9.3.3 Поиск оптимальных параметров для задачи регрессии
+# 5.3.3 Поиск оптимальных параметров для задачи классификации
 
-data <- read.csv2("C:/Trees/Income.csv")
-# разбиваем данные на обучающий и тестовый наборы.
+# устанавливаем developer-версию пакета caret
+# devtools::install_github("topepo/caret/pkg/caret")
+
+# загружаем данные
+data <- read.csv2("C:/Trees/Response.csv")
+
+# выполняем необходимые преобразования
+data[, -c(12:13)] <- lapply(data[, -c(12:13)], factor)
+
 set.seed(42)
 data$random_number <- runif(nrow(data),0,1)
-development <- data[which(data$random_number > 0.3), ]
+training <- data[which(data$random_number > 0.3), ]
 test <- data[ which(data$random_number <= 0.3), ]
-development$random_number <- NULL
+data$random_number <- NULL
+training$random_number <- NULL
 test$random_number <- NULL
-# загружаем необходимые пакеты.
-library(randomForest)
-library(caret)
-# задаем набор условий для оптимизации.
-control <- trainControl(method="repeatedcv", number=10, repeats=10, search="grid")
-set.seed(152)
-# задаем сетку параметров для решетчатого поиска.
-tunegrid <- expand.grid(.mtry=c(1:7))
-# строим модели и выбираем оптимальную.
-rf_gridsearch <- train(income~., data=development, method="rf", ntree=500,
-                       tuneGrid=tunegrid, trControl=control)
 
+# загружаем пакет caret
+library(caret)
+
+# не забудьте загрузить пакет randomForest,
+# если он ранее не был загружен
+# library(randomForest)
+
+# распараллеливаем вычисления
+library(parallel)
+library(doParallel)
+# будем использовать 3 ядра процессора
+cluster <- makeCluster(3)
+registerDoParallel(cluster)
+
+# задаем набор условий оптимизации: применяем 5-блочную 
+# перекрестную проверку и перебор параметров
+# по заданной сетке
+control <- trainControl(method="cv", number=5, 
+                        search="grid", allowParallel = TRUE)
+
+# задаем сетку параметров для решетчатого поиска
+tunegrid <- expand.grid(.mtry=c(1:7))
+
+# строим модели случайного леса и выбираем 
+# оптимальную с т.з. правильности 
+set.seed(152)
+rf_gridsearch <- train(response ~ ., data=training, method="rf", 
+                       ntree=600, tuneGrid=tunegrid, 
+                       trControl=control)
+
+# выводим результаты решетчатого поиска 
 print(rf_gridsearch)
 
+# визуализируем результаты решетчатого поиска 
 plot(rf_gridsearch)
+
+# вычисляем прогнозы для тестовой выборки
+predval <- predict(rf_gridsearch, test)
+# выводим матрицу ошибок
+table(test$response, predval)
+
+# присваиваем символьные метки значениям
+# зависимой переменной
+training$response<-factor(training$response, levels=c(0, 1),
+                          labels=c("NoResponse","Response"),exclude=NULL)
+test$response<-factor(test$response, levels=c(0, 1),
+                      labels=c("NoResponse","Response"),exclude=NULL)
+
+# задаем обновленный набор условий для оптимизации
+control <- trainControl(method="cv", number=5, search="grid",
+                         allowParallel=TRUE,
+                         classProbs=TRUE, 
+                         summaryFunction=twoClassSummary)
+
+# строим модели случайного леса и выбираем 
+# оптимальную с т.з. AUC
+set.seed(152)
+rf_gridsearch2 <- train(response ~ ., data=training, method="rf", 
+                        metric="ROC", ntree=600,
+                        tuneGrid=tunegrid, trControl=control)
+
+# выводим результаты решетчатого поиска 
+print(rf_gridsearch2)
+
+# визуализируем результаты решетчатого поиска 
+plot(rf_gridsearch2)
+
+# вычисляем AUC оптимальной модели
+# на тестовой выборке
+prob <- predict(rf_gridsearch2, test, type="prob")
+roc(test$response, prob[,2], ci=TRUE)
+
+# строим ROC-кривую оптимальной модели
+# на тестовой выборке
+plot(roc(test$response, prob[,2], ci=TRUE))
+
+# отключаем кластер параллельных вычислений
+stopCluster(cluster)
+# переводим среду R в обычный режим
+registerDoSEQ()
+
+
+# пишем собственную реализацию решетчатого 
+# поиска для случайного леса 
+customRF <- list(type = "Classification", library = "randomForest", loop = NULL)
+customRF$parameters <- data.frame(parameter = c("mtry", "nodesize"), 
+                                  class = rep("numeric", 2), label = c("mtry", "nodesize"))
+customRF$grid <- function(x, y, len = NULL, search = "grid") {}
+customRF$fit <- function(x, y, wts, param, lev, last, weights, classProbs, ...) {
+  randomForest(x, y, mtry=param$mtry, nodesize=param$nodesize, ...)
+}
+customRF$predict <- function(modelFit, newdata, preProc = NULL, submodels = NULL)
+  predict(modelFit, newdata)
+customRF$prob <- function(modelFit, newdata, preProc = NULL, submodels = NULL)
+  predict(modelFit, newdata, type = "prob")
+customRF$sort <- function(x) x[order(x[,1]),]
+customRF$levels <- function(x) x$classes
+
+control <- trainControl(method="cv", number=5, search="grid",
+                        classProbs=TRUE, summaryFunction=twoClassSummary)
+tunegrid <- expand.grid(.mtry=c(3:7), .nodesize=c(40, 50, 60))
+set.seed(152)
+custom <- train(response ~ ., ntree=600, data=training, method=customRF, metric="ROC",            
+                tuneGrid=tunegrid, trControl=control)
+
+# выводим результаты решетчатого поиска
+print(custom)
+
+# визуализируем результаты решетчатого поиска 
+plot(custom)
+
+# вычисляем AUC оптимальной модели
+# на тестовой выборке
+score <- predict(custom, test, type="prob")
+roc(test$response, score[,2], ci=TRUE)
+
+# 5.3.4 Поиск оптимальных параметров для задачи регрессии
+
+# загружаем данные
+data <- read.csv2("C:/Trees/Creddebt.csv")
+
+# выполняем необходимые преобразования
+data$ed <- ordered(data$ed, levels = c("Неполное среднее", "Среднее", "Среднее специальное",   
+                                       "Незаконченное высшее", "Высшее, ученая степень"))
+set.seed(100)
+ind <- sample(2,nrow(data),replace=TRUE,prob=c(0.7,0.3))
+tr <- data[ind==1,]
+tst <- data[ind==2,]
+
+# пишем собственную реализацию решетчатого 
+# поиска для случайного леса 
+customRF2 <- list(type = "Regression", library = "randomForest", loop = NULL)
+customRF2$parameters <- data.frame(parameter = c("mtry", "nodesize"), 
+                                   class = rep("numeric", 2), label = c("mtry", "nodesize"))
+customRF2$grid <- function(x, y, len = NULL, search = "grid") {}
+customRF2$fit <- function(x, y, wts, param, lev, last, weights, classProbs, ...) {
+  randomForest(x, y, mtry=param$mtry, nodesize=param$nodesize, ...)
+}
+customRF2$predict <- function(modelFit, newdata, preProc = NULL, submodels = NULL)
+  predict(modelFit, newdata)
+customRF2$prob <- function(modelFit, newdata, preProc = NULL, submodels = NULL)
+  predict(modelFit, newdata, type = "prob")
+customRF2$sort <- function(x) x[order(x[,1]),]
+customRF2$levels <- function(x) x$classes
+
+control <- trainControl(method="cv", number=5, search="grid")
+tunegrid <- expand.grid(.mtry=c(1:6), .nodesize=c(10, 15, 20))
+set.seed(152)
+custom2 <- train(creddebt ~ ., ntree=600, data=tr, method=customRF2,            
+                 tuneGrid=tunegrid, trControl=control)
+
+# выводим результаты решетчатого поиска 
+print(custom2)
+
+# визуализируем результаты решетчатого поиска 
+plot(custom2)
+
+
+
+
+
+
+
+
+
+
+
 
 predictions <- predict(rf_gridsearch, test)
 RMSE <- sqrt(sum(predictions - test$income)^2/length(predictions))
