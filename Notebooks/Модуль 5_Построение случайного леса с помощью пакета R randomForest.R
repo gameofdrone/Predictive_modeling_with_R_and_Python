@@ -69,6 +69,18 @@ importance(model)
 # выводим график важности предикторов
 varImpPlot(model)
 
+# вычисляем частоты использования переменных 
+# в качестве предикторов разбиения
+freq <- varUsed(model, by.tree=FALSE, count=TRUE)
+# извлекаем названия предикторов
+names <- colnames(development[,-14])
+# сопоставляем названия предикторов
+# c частотами
+names(freq) <- names
+# выводим результаты сопоставления
+freq
+
+
 # 5.1.5 Графики частной зависимости
 
 # строим график частной зависимости для переменной age,
@@ -228,7 +240,7 @@ plot(model)
 importance(model)
 varImpPlot(model)
 
-# 9.2.4 Графики частной зависимости
+# 5.2.4 Графики частной зависимости
 
 # строим график частной зависимости для переменной income
 partialPlot(model, development, income)
@@ -236,7 +248,7 @@ partialPlot(model, development, income)
 # строим график частной зависимости для переменной debtinc
 partialPlot(model, development, debtinc)
 
-# 9.2.5 Работа с прогнозами и вычисление среднеквадратической ошибки
+# 5.2.5 Работа с прогнозами и вычисление среднеквадратической ошибки
 
 # прогнозируем значения зависимой переменной 
 # для обучающей выборки обычным способом
@@ -521,6 +533,7 @@ ind <- sample(2,nrow(data),replace=TRUE,prob=c(0.7,0.3))
 tr <- data[ind==1,]
 tst <- data[ind==2,]
 
+
 # пишем собственную реализацию решетчатого 
 # поиска для случайного леса 
 customRF2 <- list(type = "Regression", library = "randomForest", loop = NULL)
@@ -537,8 +550,8 @@ customRF2$prob <- function(modelFit, newdata, preProc = NULL, submodels = NULL)
 customRF2$sort <- function(x) x[order(x[,1]),]
 customRF2$levels <- function(x) x$classes
 
-control <- trainControl(method="cv", number=5, search="grid")
-tunegrid <- expand.grid(.mtry=c(1:6), .nodesize=c(10, 15, 20))
+control <- trainControl(method="cv", number=5, search="grid", allowParallel=TRUE)
+tunegrid <- expand.grid(.mtry=c(1:6), .nodesize=c(1, 2, 3, 4))
 set.seed(152)
 custom2 <- train(creddebt ~ ., ntree=600, data=tr, method=customRF2,            
                  tuneGrid=tunegrid, trControl=control)
@@ -553,6 +566,79 @@ plot(custom2)
 # для тестовой выборки с помощью
 # оптимальной модели
 predictions <- predict(custom2, tst)
-# вычисляем корень из среднеквадратичной ошибки для контрольной выборки 
+# вычисляем корень из среднеквадратичной ошибки для тестовой выборки 
 RMSE <- sqrt(sum((tst$creddebt-predictions)^2)/nrow(tst))
-RMSE
+# вычисляем сумму квадратов отклонений фактических значений
+# зависимой переменной в тестовой выборке от ее среднего значения
+TSS <- sum((tst$creddebt-(mean(tst$creddebt)))^2)
+# вычисляем сумму квадратов отклонений фактических значений 
+# зависимой переменной в тестовой выборке от спрогнозированных
+RSS <- sum((tst$creddebt-predictions)^2)
+# вычисляем R-квадрат для тестовой выборки
+R2 <- (1-(RSS/TSS))*100
+# вычисляем среднюю абсолютную ошибку для тестовой выборки 
+MAE <- sum(abs(tst$creddebt-predictions))/nrow(tst)
+# печатаем результаты
+output <- c(RMSE, R2, MAE)
+names(output) <- c("RMSE", "R2", "MAE")
+output
+
+
+# Лекция 5.4. Улучшение интерпретабельности случайного леса с помощью пакета randomForestExplainer
+
+# устанавливаем пакет randomForestExplainer
+# devtools::install_github("MI2DataLab/randomForestExplainer")
+
+# загружаем пакет randomForestExplainer
+library(randomForestExplainer)
+
+# загружаем данные
+data <- read.csv2("C:/Trees/Response.csv")
+
+# выполняем необходимые преобразования
+data[, -c(12:13)] <- lapply(data[, -c(12:13)], factor)
+set.seed(42)
+data$random_number <- runif(nrow(data),0,1)
+development <- data[which(data$random_number > 0.3), ]
+holdout <- data[ which(data$random_number <= 0.3), ]
+development$random_number <- NULL
+holdout$random_number <- NULL
+
+# задаем стартовое значение генератора
+# случайных чисел
+set.seed(152)
+# строим случайный лес деревьев классификации
+forest<-randomForest(response ~., development, localImp=TRUE)
+
+# мы передаем нашу модель случайного леса функции
+# min_depth_distribution, чтобы получить информацию
+# о значениях минимальной глубины для каждого 
+# предиктора и сохраняем результат в файл
+min_depth_frame <- min_depth_distribution(forest)
+save(min_depth_frame, file = "min_depth_frame.rda")
+# загружаем результаты из файла
+load("min_depth_frame.rda")
+# выводим информацию о значении минимальной глубины
+# для всех предикторов по первому дереву
+subset(min_depth_frame, min_depth_frame$tree == 1)
+
+# выводим график распределения минимальной глубины
+plot_min_depth_distribution(min_depth_frame)
+
+# выводим график распределения минимальной глубины,
+# ограничившись 5 наиболее важными предикторами
+plot_min_depth_distribution(min_depth_frame, 
+                            mean_sample = "relevant_trees", 
+                            k = 5)
+
+# вычислим альтернативные метрики важности
+importance_frame <- measure_importance(forest)
+importance_frame
+
+# постороим многомерный график для
+# оценки важности предикторов
+plot_multi_way_importance(importance_frame)
+
+
+
+
