@@ -613,11 +613,8 @@ forest<-randomForest(response ~., development, localImp=TRUE)
 # мы передаем нашу модель случайного леса функции
 # min_depth_distribution, чтобы получить информацию
 # о значени€х минимальной глубины дл€ каждого 
-# предиктора и сохран€ем результат в файл
+# предиктора по каждому дереву
 min_depth_frame <- min_depth_distribution(forest)
-save(min_depth_frame, file = "min_depth_frame.rda")
-# загружаем результаты из файла
-load("min_depth_frame.rda")
 # выводим информацию о значении минимальной глубины
 # дл€ всех предикторов по первому дереву
 subset(min_depth_frame, min_depth_frame$tree == 1)
@@ -639,6 +636,38 @@ importance_frame
 # оценки важности предикторов
 plot_multi_way_importance(importance_frame)
 
+# строим вручную настроенный многомерный
+# график дл€ оценки важности предикторов
+plot_multi_way_importance(importance_frame, 
+                          x_measure = "accuracy_decrease",
+                          y_measure = "gini_decrease",
+                          size_measure = "times_a_root", 
+                          no_of_labels = 5)
+
+# строим парные графики дл€ оценки коррел€ций 
+# между метриками важности
+plot_importance_ggpairs(importance_frame)
+
+# строим парные графики дл€ оценки коррел€ций 
+# между метриками важности с добавлением 
+# сглаживани€ LOESS
+plot_importance_rankings(importance_frame)
+
+# извлекаем имена 5 наиболее
+# важных предикторов
+vars <- important_variables(importance_frame, 
+                            k = 5, 
+                            measures = c("mean_min_depth",
+                                         "no_of_trees"))
+
+# строим таблицу взаимодействий
+interactions_frame <- min_depth_interactions(forest, vars)
+
+# выведем первые 6 строк таблицы
+head(interactions_frame[order(interactions_frame$occurrences, decreasing = TRUE), ])
+
+# визуализируем полученные данные
+plot_min_depth_interactions(interactions_frame)
 
 
 
