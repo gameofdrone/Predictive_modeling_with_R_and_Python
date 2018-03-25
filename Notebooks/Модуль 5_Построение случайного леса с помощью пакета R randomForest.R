@@ -669,5 +669,23 @@ head(interactions_frame[order(interactions_frame$occurrences, decreasing = TRUE)
 # визуализируем полученные данные
 plot_min_depth_interactions(interactions_frame)
 
+# загружаем данные
+data <- read.csv2("C:/Trees/boston.csv")
+data$CHAS <- as.logical(data$CHAS)
+
+# задаем стартовое значение генератора случайных
+# чисел для воспроизводимости результатов
+set.seed(152)
+
+# строим случайный лес деревьев регрессии
+rf <-randomForest(MV ~., data, localImp=TRUE)
+
+# построим теплокарту прогнозов для
+# взаимодействия предикторов RM и LSTAT
+plot_predict_interaction(rf, data, "RM", "LSTAT") 
+
+
+
+
 
 
